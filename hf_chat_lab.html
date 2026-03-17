@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HF Chat Lab</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #171b2e;
+      --panel-2: #1e2440;
+      --text: #eef2ff;
+      --muted: #aab3d1;
+      --accent: #8ab4ff;
+      --good: #84f0a8;
+      --warn: #ffd479;
+      --bad: #ff8e8e;
+      --border: rgba(255,255,255,0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b0e19, #10152a);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    p { color: var(--muted); line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: rgba(23,27,46,0.9);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.24);
+      backdrop-filter: blur(10px);
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      margin-top: 12px;
+    }
+    input, textarea, select, button {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 10px 12px;
+      font: inherit;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    button {
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform .05s ease, opacity .2s ease;
+    }
+    button:hover { opacity: 0.96; }
+    button:active { transform: translateY(1px); }
+    button.primary { background: linear-gradient(180deg, #78a8ff, #5f86ff); color: #071127; border: none; }
+    button.secondary { background: #212845; }
+    button.good { background: linear-gradient(180deg, #90f0ae, #59d87c); color: #062114; border: none; }
+    button.warn { background: linear-gradient(180deg, #ffd77d, #f0b95d); color: #271500; border: none; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      width: auto;
+      padding: 10px 14px;
+      background: #1a2038;
+    }
+    .tab.active {
+      background: linear-gradient(180deg, #7ca9ff, #5f86ff);
+      color: #081226;
+      border: none;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .status {
+      font-size: 13px;
+      white-space: pre-wrap;
+      background: #0d1120;
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      min-height: 92px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(138,180,255,0.12);
+      border: 1px solid rgba(138,180,255,0.25);
+      color: var(--accent);
+      font-size: 12px;
+      margin-right: 6px;
+      margin-bottom: 8px;
+    }
+    .output {
+      background: #0d1120;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      min-height: 180px;
+    }
+    .token-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      max-height: 460px;
+      overflow: auto;
+      margin-top: 12px;
+    }
+    .token-item {
+      background: #0d1120;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: start;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .small { font-size: 12px; color: var(--muted); }
+    .section-divider {
+      margin: 18px 0;
+      border-top: 1px solid var(--border);
+    }
+    .chat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hint {
+      color: var(--warn);
+      font-size: 13px;
+      line-height: 1.45;
+      background: rgba(255,212,121,0.08);
+      border: 1px solid rgba(255,212,121,0.22);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .success { color: var(--good); }
+    .danger { color: var(--bad); }
+    @media (max-width: 900px) {
+      .grid, .chat-grid, .row, .row-3 { grid-template-columns: 1fr; }
+      .wrap { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>HF Chat Lab 🤖🧪</h1>
+    <p>Load a Hugging Face chat model, use it directly, inspect token outliers around the embedding centroid, and generate a fine-tuning package. This is browser-first, so model support depends on whether the model has a browser-friendly Transformers.js / ONNX build.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Model loader</h2>
+        <label for="modelId">Model ID</label>
+        <input id="modelId" value="onnx-community/Qwen2.5-0.5B-Instruct" />
+
+        <label for="hfToken">HF token (optional)</label>
+        <input id="hfToken" type="password" placeholder="Needed for private or gated models" />
+
+        <div class="row">
+          <div>
+            <label for="device">Device</label>
+            <select id="device">
+              <option value="webgpu">webgpu</option>
+              <option value="wasm">wasm</option>
+            </select>
+          </div>
+          <div>
+            <label for="dtype">dtype</label>
+            <select id="dtype">
+              <option value="q4">q4</option>
+              <option value="q8">q8</option>
+              <option value="fp16">fp16</option>
+              <option value="fp32">fp32</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="primary" id="loadBtn">Load model + tokenizer</button>
+          <button class="secondary" id="unloadBtn">Unload</button>
+        </div>
+
+        <div class="section-divider"></div>
+        <div>
+          <span class="pill">Browser only</span>
+          <span class="pill">No server required for inference</span>
+          <span class="pill">Best with small ONNX chat models</span>
+        </div>
+
+        <label>Status</label>
+        <div id="status" class="status">Waiting for a model…</div>
+      </div>
+
+      <div class="card">
+        <div class="tabs">
+          <button class="tab active" data-tab="use">Use</button>
+          <button class="tab" data-tab="glitch">Find glitch tokens</button>
+          <button class="tab" data-tab="finetune">Fine-tune helper</button>
+        </div>
+
+        <div class="panel active" id="panel-use">
+          <h2>Use the model</h2>
+          <div class="chat-grid">
+            <div>
+              <label for="systemPrompt">System prompt</label>
+              <textarea id="systemPrompt">You are a helpful assistant.</textarea>
+            </div>
+            <div>
+              <label for="userPrompt">User message</label>
+              <textarea id="userPrompt">Tell me something weird and interesting about glitch tokens.</textarea>
+            </div>
+          </div>
+          <div class="row-3">
+            <div>
+              <label for="maxNewTokens">Max new tokens</label>
+              <input id="maxNewTokens" type="number" value="120" min="1" max="2048" />
+            </div>
+            <div>
+              <label for="temperature">Temperature</label>
+              <input id="temperature" type="number" value="0.8" step="0.1" min="0" max="3" />
+            </div>
+            <div>
+              <label for="topP">Top-p</label>
+              <input id="topP" type="number" value="0.95" step="0.01" min="0" max="1" />
+            </div>
+          </div>
+          <div class="row">
+            <button class="good" id="generateBtn">Generate</button>
+            <button class="secondary" id="copyResponseBtn">Copy response</button>
+          </div>
+          <label>Output</label>
+          <div id="generationOutput" class="output">Nothing generated yet.</div>
+        </div>
+
+        <div class="panel" id="panel-glitch">
+          <h2>Find glitch tokens</h2>
+          <p>This tries to inspect the input embedding matrix, computes the centroid, then shows the closest and farthest tokens by Euclidean distance. It works best with models whose embeddings are accessible in Transformers.js.</p>
+          <div class="row-3">
+            <div>
+              <label for="closestCount">Closest tokens</label>
+              <input id="closestCount" type="number" value="25" min="1" max="500" />
+            </div>
+            <div>
+              <label for="farthestCount">Farthest tokens</label>
+              <input id="farthestCount" type="number" value="25" min="1" max="500" />
+            </div>
+            <div>
+              <label for="sampleLimit">Max vocab rows to inspect</label>
+              <input id="sampleLimit" type="number" value="0" min="0" />
+            </div>
+          </div>
+          <div class="row">
+            <button class="warn" id="analyzeBtn">Analyze embeddings</button>
+            <button class="secondary" id="copyTokensBtn">Copy all shown tokens</button>
+          </div>
+          <div class="row">
+            <div>
+              <label>Closest to centroid</label>
+              <div id="closestTokens" class="token-list"></div>
+            </div>
+            <div>
+              <label>Farthest from centroid</label>
+              <div id="farthestTokens" class="token-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-finetune">
+          <h2>Fine-tune helper</h2>
+          <div class="hint">
+            Real fine-tuning of chat models is generally <b>not practical inside plain browser HTML</b> 🫠, especially for anything beyond tiny experiments. So this tab builds a <b>downloadable training package</b> for LoRA/SFT fine-tuning in Python, based on either an uploaded dataset file or a Hugging Face dataset name. It also lets you preview examples and generate a test script.
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="datasetFile">Upload dataset file (.json, .jsonl, .txt, .csv)</label>
+              <input id="datasetFile" type="file" />
+            </div>
+            <div>
+              <label for="datasetName">Or Hugging Face dataset</label>
+              <input id="datasetName" placeholder="e.g. tatsu-lab/alpaca or username/dataset" />
+            </div>
+          </div>
+
+          <div class="row-3">
+            <div>
+              <label for="epochs">Epochs</label>
+              <input id="epochs" type="number" value="1" min="1" max="20" />
+            </div>
+            <div>
+              <label for="batchSize">Batch size</label>
+              <input id="batchSize" type="number" value="1" min="1" max="128" />
+            </div>
+            <div>
+              <label for="learningRate">Learning rate</label>
+              <input id="learningRate" type="text" value="2e-4" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="textField">Dataset text field</label>
+              <input id="textField" value="text" />
+            </div>
+            <div>
+              <label for="outputDir">Output dir</label>
+              <input id="outputDir" value="finetuned-output" />
+            </div>
+          </div>
+
+          <div class="row">
+            <button class="good" id="previewDatasetBtn">Preview dataset</button>
+            <button class="primary" id="buildPackageBtn">Build fine-tune package</button>
+          </div>
+          <div class="row">
+            <button class="secondary" id="downloadTrainBtn">Download train.py</button>
+            <button class="secondary" id="downloadTestBtn">Download test_model.py</button>
+          </div>
+
+          <label>Dataset preview / package notes</label>
+          <div id="finetuneOutput" class="output">No dataset loaded yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { pipeline, AutoTokenizer, AutoModelForCausalLM, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
+
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $('status');
+    const generationOutput = $('generationOutput');
+    const closestTokensEl = $('closestTokens');
+    const farthestTokensEl = $('farthestTokens');
+    const finetuneOutput = $('finetuneOutput');
+
+    let generator = null;
+    let tokenizer = null;
+    let model = null;
+    let lastResponse = '';
+    let cachedTokenDump = '';
+    let uploadedDataset = { name: null, text: null, preview: null };
+    let generatedTrainPy = '';
+    let generatedTestPy = '';
+
+    function setStatus(msg, kind = 'normal') {
+      statusEl.textContent = msg;
+      statusEl.className = 'status' + (kind === 'good' ? ' success' : kind === 'bad' ? ' danger' : '');
+    }
+
+    function humanError(err) {
+      return err?.message || String(err);
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+      document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${name}`));
+    }
+
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    async function loadModel() {
+      const modelId = $('modelId').value.trim();
+      const dtype = $('dtype').value;
+      const device = $('device').value;
+      const hfToken = $('hfToken').value.trim();
+
+      if (!modelId) {
+        setStatus('Please enter a model ID first.', 'bad');
+        return;
+      }
+
+      try {
+        generator = null;
+        tokenizer = null;
+        model = null;
+
+        if (hfToken) {
+          env.useBrowserCache = true;
+          env.allowRemoteModels = true;
+          env.remoteHost = 'https://huggingface.co/';
+          // Browser builds do not expose env vars like Node, so we stash the token here.
+          env.HF_TOKEN = hfToken;
+        }
+
+        setStatus(`Loading ${modelId}…\nThis can take a while the first time, especially with WebGPU and larger files.`);
+
+        const options = {
+          device,
+          dtype,
+          progress_callback: (info) => {
+            const bits = [];
+            if (info?.file) bits.push(`file: ${info.file}`);
+            if (typeof info?.progress === 'number') bits.push(`progress: ${(info.progress * 100).toFixed(1)}%`);
+            if (info?.status) bits.push(`status: ${info.status}`);
+            setStatus(`Loading ${modelId}…\n${bits.join('\n') || 'Working…'}`);
+          },
+        };
+
+        tokenizer = await AutoTokenizer.from_pretrained(modelId);
+        model = await AutoModelForCausalLM.from_pretrained(modelId, options);
+        generator = await pipeline('text-generation', modelId, options);
+
+        setStatus(`Loaded successfully.\nModel: ${modelId}\nDevice: ${device}\nDType: ${dtype}`, 'good');
+      } catch (err) {
+        setStatus(
+          `Load failed.\n\n${humanError(err)}\n\nTips:\n- Try a smaller ONNX/community model.\n- Switch device from webgpu to wasm.\n- Check whether the model has browser-compatible files.`,
+          'bad'
+        );
+      }
+    }
+
+    function unloadModel() {
+      generator = null;
+      tokenizer = null;
+      model = null;
+      generationOutput.textContent = 'Model unloaded.';
+      closestTokensEl.innerHTML = '';
+      farthestTokensEl.innerHTML = '';
+      setStatus('Unloaded. Browser memory should free up after a bit.');
+    }
+
+    function normalizeGeneratedText(output) {
+      try {
+        const first = Array.isArray(output) ? output[0] : output;
+        const gt = first?.generated_text;
+        if (typeof gt === 'string') return gt;
+        if (Array.isArray(gt)) {
+          const last = gt.at(-1);
+          if (typeof last?.content === 'string') return last.content;
+          return JSON.stringify(gt, null, 2);
+        }
+        return JSON.stringify(output, null, 2);
+      } catch {
+        return String(output);
+      }
+    }
+
+    async function generateText() {
+      if (!generator) {
+        setStatus('Load a model first.', 'bad');
+        return;
+      }
+
+      const systemPrompt = $('systemPrompt').value.trim();
+      const userPrompt = $('userPrompt').value.trim();
+      const max_new_tokens = Number($('maxNewTokens').value || 120);
+      const temperature = Number($('temperature').value || 0.8);
+      const top_p = Number($('topP').value || 0.95);
+
+      try {
+        generationOutput.textContent = 'Generating…';
+        const messages = [];
+        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+        messages.push({ role: 'user', content: userPrompt });
+
+        const output = await generator(messages, {
+          max_new_tokens,
+          temperature,
+          top_p,
+          do_sample: temperature > 0,
+        });
+
+        lastResponse = normalizeGeneratedText(output);
+        generationOutput.textContent = lastResponse;
+      } catch (err) {
+        generationOutput.textContent = `Generation failed.\n\n${humanError(err)}`;
+      }
+    }
+
+    function tryPath(obj, path) {
+      return path.split('.').reduce((acc, key) => acc?.[key], obj);
+    }
+
+    function findEmbeddingTensor(modelObj) {
+      const candidates = [
+        'model.embed_tokens.weight',
+        'model.model.embed_tokens.weight',
+        'model.decoder.embed_tokens.weight',
+        'model.model.decoder.embed_tokens.weight',
+        'transformer.wte.weight',
+        'model.transformer.wte.weight',
+        'wte.weight',
+        'lm_head.weight',
+        'model.lm_head.weight',
+        'model.get_input_embeddings().weight',
+      ];
+
+      for (const path of candidates) {
+        try {
+          if (path.includes('()')) continue;
+          const value = tryPath(modelObj, path);
+          if (value?.dims?.length === 2 && value?.data) return value;
+        } catch {}
+      }
+
+      if (typeof modelObj?.get_input_embeddings === 'function') {
+        try {
+          const emb = modelObj.get_input_embeddings();
+          if (emb?.weight?.dims?.length === 2 && emb?.weight?.data) return emb.weight;
+        } catch {}
+      }
+
+      const seen = new Set();
+      const stack = [modelObj];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (!cur || typeof cur !== 'object' || seen.has(cur)) continue;
+        seen.add(cur);
+        for (const key of Object.keys(cur)) {
+          const value = cur[key];
+          if (value?.dims?.length === 2 && value?.data && Array.isArray(value.dims)) {
+            const [a, b] = value.dims;
+            if (a > 1000 && b > 8) return value;
+          }
+          if (value && typeof value === 'object') stack.push(value);
+        }
+      }
+      return null;
+    }
+
+    function decodeTokenSafe(id) {
+      try {
+        let text = tokenizer.decode([id], { skip_special_tokens: false });
+        text = text.replace(/\n/g, '\\n').replace(/\t/g, '\\t');
+        return text || '(empty decode)';
+      } catch {
+        return `(token ${id})`;
+      }
+    }
+
+    function pushBest(arr, item, max, ascending = true) {
+      arr.push(item);
+      arr.sort((a, b) => ascending ? a.distance - b.distance : b.distance - a.distance);
+      if (arr.length > max) arr.length = max;
+    }
+
+    function renderTokenList(el, items) {
+      el.innerHTML = '';
+      for (const item of items) {
+        const div = document.createElement('div');
+        div.className = 'token-item';
+        div.innerHTML = `
+          <div class="mono small">#${item.id}</div>
+          <div>
+            <div class="mono">${escapeHtml(item.token)}</div>
+            <div class="small">distance: ${item.distance.toFixed(6)}</div>
+          </div>
+          <button class="secondary copy-one">Copy</button>
+        `;
+        div.querySelector('.copy-one').addEventListener('click', async () => {
+          await navigator.clipboard.writeText(item.token);
+        });
+        el.appendChild(div);
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    async function analyzeEmbeddings() {
+      if (!model || !tokenizer) {
+        setStatus('Load a model first.', 'bad');
+        return;
+      }
+
+      try {
+        setStatus('Looking for an embedding matrix…');
+        const emb = findEmbeddingTensor(model);
+        if (!emb) {
+          throw new Error('Could not find an accessible 2D embedding tensor on this model.');
+        }
+
+        const [vocabSize, hiddenSize] = emb.dims;
+        const data = emb.data;
+        const closestN = Math.max(1, Number($('closestCount').value || 25));
+        const farthestN = Math.max(1, Number($('farthestCount').value || 25));
+        let inspectRows = Number($('sampleLimit').value || 0);
+        if (!inspectRows || inspectRows <= 0 || inspectRows > vocabSize) inspectRows = vocabSize;
+
+        setStatus(`Found embedding matrix.\nVocab rows: ${vocabSize}\nHidden size: ${hiddenSize}\nInspecting: ${inspectRows} rows`);
+
+        const centroid = new Float64Array(hiddenSize);
+        for (let row = 0; row < inspectRows; row++) {
+          const base = row * hiddenSize;
+          for (let j = 0; j < hiddenSize; j++) centroid[j] += data[base + j];
+          if (row % 2000 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+        for (let j = 0; j < hiddenSize; j++) centroid[j] /= inspectRows;
+
+        const closest = [];
+        const farthest = [];
+        for (let row = 0; row < inspectRows; row++) {
+          const base = row * hiddenSize;
+          let sum = 0;
+          for (let j = 0; j < hiddenSize; j++) {
+            const d = data[base + j] - centroid[j];
+            sum += d * d;
+          }
+          const distance = Math.sqrt(sum);
+          const token = decodeTokenSafe(row);
+          const item = { id: row, token, distance };
+          pushBest(closest, item, closestN, true);
+          pushBest(farthest, item, farthestN, false);
+          if (row % 1000 === 0) setStatus(`Analyzing embeddings…\nRow ${row} / ${inspectRows}`);
+          if (row % 2000 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+
+        renderTokenList(closestTokensEl, closest);
+        renderTokenList(farthestTokensEl, farthest);
+
+        cachedTokenDump = [
+          'Closest to centroid:',
+          ...closest.map(x => `${x.id}\t${x.distance}\t${x.token}`),
+          '',
+          'Farthest from centroid:',
+          ...farthest.map(x => `${x.id}\t${x.distance}\t${x.token}`),
+        ].join('\n');
+
+        setStatus('Done. Token outliers calculated successfully.', 'good');
+      } catch (err) {
+        setStatus(`Glitch-token analysis failed.\n\n${humanError(err)}`, 'bad');
+      }
+    }
+
+    async function copyText(text) {
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+    }
+
+    async function readUploadedFile(file) {
+      return await file.text();
+    }
+
+    function safeJsonParse(text) {
+      try { return JSON.parse(text); } catch { return null; }
+    }
+
+    function previewDatasetText(text, filename = 'uploaded file') {
+      const trimmed = text.trim();
+      if (!trimmed) return 'Uploaded file is empty.';
+
+      const json = safeJsonParse(trimmed);
+      if (Array.isArray(json)) {
+        return `Detected JSON array from ${filename}.\nItems: ${json.length}\n\nFirst item:\n${JSON.stringify(json[0], null, 2)}`;
+      }
+      if (json && typeof json === 'object') {
+        const keys = Object.keys(json);
+        return `Detected JSON object from ${filename}.\nKeys: ${keys.join(', ')}\n\nPreview:\n${JSON.stringify(json, null, 2).slice(0, 2500)}`;
+      }
+
+      const lines = trimmed.split(/\r?\n/);
+      const preview = lines.slice(0, 8).join('\n');
+      return `Detected text-like dataset from ${filename}.\nLines: ${lines.length}\n\nPreview:\n${preview}`;
+    }
+
+    function buildTrainScript() {
+      const modelId = $('modelId').value.trim() || 'your/model';
+      const datasetName = $('datasetName').value.trim();
+      const textField = $('textField').value.trim() || 'text';
+      const outputDir = $('outputDir').value.trim() || 'finetuned-output';
+      const epochs = Number($('epochs').value || 1);
+      const batchSize = Number($('batchSize').value || 1);
+      const learningRate = $('learningRate').value.trim() || '2e-4';
+      const localDatasetName = uploadedDataset.name ? uploadedDataset.name.replace(/[^a-zA-Z0-9_.-]/g, '_') : 'dataset.jsonl';
+
+      return `import os\nimport json\nfrom datasets import load_dataset\nfrom transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments\nfrom peft import LoraConfig, get_peft_model\nfrom trl import SFTTrainer\n\nMODEL_ID = ${JSON.stringify(modelId)}\nOUTPUT_DIR = ${JSON.stringify(outputDir)}\nTEXT_FIELD = ${JSON.stringify(textField)}\n\ndef load_data():\n    local_path = ${JSON.stringify(localDatasetName)}\n    if os.path.exists(local_path):\n        ext = os.path.splitext(local_path)[1].lower()\n        if ext == '.jsonl':\n            return load_dataset('json', data_files=local_path, split='train')\n        elif ext == '.json':\n            return load_dataset('json', data_files=local_path, split='train')\n        elif ext == '.csv':\n            return load_dataset('csv', data_files=local_path, split='train')\n        else:\n            raise ValueError(f'Unsupported local file type: {ext}')\n    ${datasetName ? `return load_dataset(${JSON.stringify(datasetName)}, split='train')` : `raise ValueError('No local dataset file found and no HF dataset name was provided.')`}\n\n\ndef main():\n    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)\n    model = AutoModelForCausalLM.from_pretrained(MODEL_ID)\n\n    if tokenizer.pad_token is None:\n        tokenizer.pad_token = tokenizer.eos_token\n\n    dataset = load_data()\n\n    peft_config = LoraConfig(\n        r=16,\n        lora_alpha=32,\n        lora_dropout=0.05,\n        bias='none',\n        task_type='CAUSAL_LM',\n    )\n\n    model = get_peft_model(model, peft_config)\n\n    training_args = TrainingArguments(\n        output_dir=OUTPUT_DIR,\n        num_train_epochs=${epochs},\n        per_device_train_batch_size=${batchSize},\n        learning_rate=${learningRate},\n        logging_steps=10,\n        save_strategy='epoch',\n        report_to='none',\n        fp16=False,\n        bf16=False,\n    )\n\n    trainer = SFTTrainer(\n        model=model,\n        tokenizer=tokenizer,\n        train_dataset=dataset,\n        dataset_text_field=TEXT_FIELD,\n        args=training_args,\n        max_seq_length=1024,\n    )\n\n    trainer.train()\n    trainer.model.save_pretrained(OUTPUT_DIR)\n    tokenizer.save_pretrained(OUTPUT_DIR)\n    print(f'Saved fine-tuned model to {OUTPUT_DIR}')\n\nif __name__ == '__main__':\n    main()\n`;
+    }
+
+    function buildTestScript() {
+      const outputDir = $('outputDir').value.trim() || 'finetuned-output';
+      return `from transformers import AutoTokenizer, AutoModelForCausalLM\nimport torch\n\nMODEL_DIR = ${JSON.stringify(outputDir)}\nPROMPT = 'Tell me something weird about token embeddings.'\n\n\ndef main():\n    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)\n    model = AutoModelForCausalLM.from_pretrained(MODEL_DIR)\n\n    inputs = tokenizer(PROMPT, return_tensors='pt')\n    with torch.no_grad():\n        outputs = model.generate(**inputs, max_new_tokens=120, do_sample=True, temperature=0.8, top_p=0.95)\n\n    print(tokenizer.decode(outputs[0], skip_special_tokens=True))\n\nif __name__ == '__main__':\n    main()\n`;
+    }
+
+    function downloadTextFile(filename, text) {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function previewDataset() {
+      const file = $('datasetFile').files?.[0];
+      const datasetName = $('datasetName').value.trim();
+
+      if (file) {
+        const text = await readUploadedFile(file);
+        uploadedDataset = { name: file.name, text, preview: previewDatasetText(text, file.name) };
+        finetuneOutput.textContent = uploadedDataset.preview;
+        return;
+      }
+
+      if (datasetName) {
+        uploadedDataset = { name: null, text: null, preview: `Dataset source: ${datasetName}\n\nThis HTML tool cannot inspect remote dataset rows directly without a separate fetch path, but the generated training package will use load_dataset('${datasetName}').` };
+        finetuneOutput.textContent = uploadedDataset.preview;
+        return;
+      }
+
+      finetuneOutput.textContent = 'Please upload a dataset file or enter a dataset name.';
+    }
+
+    async function buildFineTunePackage() {
+      generatedTrainPy = buildTrainScript();
+      generatedTestPy = buildTestScript();
+      const requirements = `transformers\ndatasets\npeft\ntrl\naccelerate\ntorch\n`;
+      let notes = `Built a fine-tuning package.\n\nFiles ready to download:\n- train.py\n- test_model.py\n\nRecommended extras:\n- requirements.txt containing:\n${requirements}`;
+      if (uploadedDataset?.name) {
+        notes += `\n\nUploaded dataset remembered: ${uploadedDataset.name}`;
+      }
+      notes += `\n\nHeads-up:\nThis package is a starter LoRA/SFT workflow. Depending on the exact model, you may need to adjust target modules, packing, quantization, or chat-template formatting.`;
+      finetuneOutput.textContent = notes;
+    }
+
+    $('loadBtn').addEventListener('click', loadModel);
+    $('unloadBtn').addEventListener('click', unloadModel);
+    $('generateBtn').addEventListener('click', generateText);
+    $('copyResponseBtn').addEventListener('click', () => copyText(lastResponse));
+    $('analyzeBtn').addEventListener('click', analyzeEmbeddings);
+    $('copyTokensBtn').addEventListener('click', () => copyText(cachedTokenDump));
+    $('previewDatasetBtn').addEventListener('click', previewDataset);
+    $('buildPackageBtn').addEventListener('click', buildFineTunePackage);
+    $('downloadTrainBtn').addEventListener('click', () => {
+      generatedTrainPy ||= buildTrainScript();
+      downloadTextFile('train.py', generatedTrainPy);
+    });
+    $('downloadTestBtn').addEventListener('click', () => {
+      generatedTestPy ||= buildTestScript();
+      downloadTextFile('test_model.py', generatedTestPy);
+    });
+  </script>
+</body>
+</html>
